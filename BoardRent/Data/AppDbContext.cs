@@ -19,23 +19,23 @@ namespace BoardRent.Data
 
         public void EnsureCreated()
         {
-            using (var masterConn = new SqlConnection(
+            using (var masterConnection = new SqlConnection(
                 "Server=(localdb)\\MSSQLLocalDB;Database=master;Trusted_Connection=True;"))
             {
-                masterConn.Open();
-                using var masterCmd = masterConn.CreateCommand();
-                masterCmd.CommandText = @"
+                masterConnection.Open();
+                using var masterCommand = masterConnection.CreateCommand();
+                masterCommand.CommandText = @"
                     IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'BoardRentDb')
                     CREATE DATABASE BoardRentDb;
                 ";
-                masterCmd.ExecuteNonQuery();
+                masterCommand.ExecuteNonQuery();
             }
 
             using var connection = CreateConnection();
             connection.Open();
 
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
                 -- Roles Table
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Role')
                 CREATE TABLE Role (
@@ -102,7 +102,7 @@ namespace BoardRent.Data
                 END
             ";
 
-            cmd.ExecuteNonQuery();
+            command.ExecuteNonQuery();
         }
     }
 }
