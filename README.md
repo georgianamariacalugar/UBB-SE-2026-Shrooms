@@ -1,5 +1,4 @@
 # BoardRent — User Management & Profile Section
----
 
 ## Prerequisites
 - Visual Studio 2026 (WinUI 3 / Windows App SDK workload installed)
