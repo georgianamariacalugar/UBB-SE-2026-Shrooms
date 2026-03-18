@@ -42,6 +42,10 @@
   6. Open a Pull Request to merge back into `main`
   7. **Never rebase — always merge**
 
+## Development conventions
+- All ViewModels must extend `BaseViewModel`
+- All service methods must return `ServiceResult<T>`
+
 ## Branch ownership
 | Branch                 | Owner      |
 |------------------------|------------|
