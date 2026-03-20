@@ -94,7 +94,7 @@ namespace BoardRent.Data
 
                     INSERT INTO [User] (Id, Username, DisplayName, Email, PasswordHash, IsSuspended, CreatedAt, UpdatedAt)
                     VALUES (
-                        @adminId, 'admin', 'Administrator', 'admin@boardrent.com', 'PLACEHOLDER_HASH', 0, GETUTCDATE(), GETUTCDATE()
+                        @adminId, 'admin', 'Administrator', 'admin@boardrent.com', '0Or88pPVbOSyUxu9djhSTw==:+uoeZ/oHtxEVK8bHfS5Eh/5chC0LoKdNvZjAVQhu7aw=', 0, GETUTCDATE(), GETUTCDATE()
                     );
 
                     INSERT INTO UserRoles (UserId, RoleId)
