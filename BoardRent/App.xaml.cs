@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Xaml;
+﻿using System;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using BoardRent.Data;
 using BoardRent.Views;
@@ -28,13 +29,13 @@ namespace BoardRent
             db.EnsureCreated();
 
             //Start at login page
-            //NavigateTo(typeof(LoginPage));
+            NavigateTo(typeof(LoginPage));
         }
 
-        /*public static void NavigateTo(Type pageType)
+        public static void NavigateTo(Type pageType)
         {
             _rootFrame?.Navigate(pageType);
-        }*/
+        }
 
         public static void NavigateBack()
         {
