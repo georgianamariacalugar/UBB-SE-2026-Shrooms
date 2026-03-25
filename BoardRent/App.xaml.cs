@@ -1,9 +1,13 @@
-﻿using System;
+﻿using BoardRent.Data;
+using BoardRent.Repositories;
+using BoardRent.Services;
+using BoardRent.ViewModels;
+using BoardRent.Views;
+using CommunityToolkit.Mvvm.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using BoardRent.Data;
-using BoardRent.Views;
-using Microsoft.UI.Xaml.Controls.Primitives;
+using System;
 
 namespace BoardRent
 {
@@ -15,8 +19,24 @@ namespace BoardRent
         public App()
         {
             InitializeComponent();
+
+            Ioc.Default.ConfigureServices(
+                new ServiceCollection()
+
+                .AddTransient<AppDbContext>()
+
+                .AddTransient<LoginViewModel>()
+                .AddTransient<RegisterViewModel>()
+
+                .AddSingleton<IAuthService, AuthService>()
+
+                .AddSingleton<IUserRepository, UserRepository>()
+                .AddSingleton<IFailedLoginRepository, FailedLoginRepository>()
+
+                .BuildServiceProvider()
+            );
         }
-        
+
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
             _window = new MainWindow();
@@ -24,11 +44,9 @@ namespace BoardRent
             _window.Content = _rootFrame;
             _window.Activate();
 
-            // Create DB tables on first launch
             var db = new AppDbContext();
             db.EnsureCreated();
 
-            //Start at login page
             NavigateTo(typeof(LoginPage));
         }
 
