@@ -1,4 +1,4 @@
-# UBB-SE-2026-Shrooms
+# UBB-SE-2026-Shroomsa
 
 \# BoardRent — User Management Module
 
