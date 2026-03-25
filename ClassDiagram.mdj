@@ -13553,7 +13553,7 @@
 											"top": 364,
 											"width": 95,
 											"height": 13,
-											"text": "+RoleId: int",
+											"text": "+RoleId: Guid",
 											"horizontalAlignment": 0
 										}
 									],
@@ -14617,7 +14617,7 @@
 										"$ref": "AAAAAAUserRoleClass1="
 									},
 									"name": "RoleId",
-									"type": "int"
+									"type": "Guid"
 								}
 							]
 						}
