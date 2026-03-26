@@ -54,23 +54,6 @@ namespace BoardRent.Views
             };
         }
 
-        private async void UploadAvatar_Click(object sender, RoutedEventArgs e)
-        {
-            var picker = new FileOpenPicker();// usually only one window exists
-            var hwnd = WindowNative.GetWindowHandle(App._window);
-            InitializeWithWindow.Initialize(picker, hwnd);
-
-            picker.FileTypeFilter.Add(".jpg");
-            picker.FileTypeFilter.Add(".png");
-
-            var file = await picker.PickSingleFileAsync();
-            if (file == null) return;
-
-            var userId = SessionContext.GetInstance().UserId;
-            var savedPath = await ViewModel.UploadAvatar(userId, file.Path);
-
-            ViewModel.AvatarUrl = savedPath;
-        }
 
         private async void SignOut_Click(object sender, RoutedEventArgs e)
         {
