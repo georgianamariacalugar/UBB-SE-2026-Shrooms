@@ -48,15 +48,13 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Grid ColumnSpacing="20" RowSpacing="10">
+                            <Grid ColumnSpacing="20" RowSpacing="5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -71,33 +69,38 @@
                                 <TextBox Grid.Row="1" Grid.Column="0"
                                          Header="Email"
                                          Text="{Binding Email}"
-                                         IsReadOnly="True"/>
-
-                                <TextBox Grid.Row="2" Grid.Column="0"
+                                         IsReadOnly="True"
+                                         Margin="0,0,0,24"/>
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBox
                                          Header="Display Name"
                                          Text="{Binding DisplayName, Mode=TwoWay}"/>
-                                <TextBlock  Grid.Row="3" Grid.Column="0" Text="{Binding DisplayNameError}" Foreground="Red" FontSize="12"  TextWrapping="Wrap"/>
+                                    <TextBlock  Text="{Binding DisplayNameError}" Foreground="Red" FontSize="12"  TextWrapping="Wrap" Margin="0,0,0,0" VerticalAlignment="Top"  />
 
+                                </StackPanel>
+                                <StackPanel Grid.Row="3" Grid.Column="0">
+                                    <TextBox
+                                        Header="Phone Number"
+                                         Text="{Binding PhoneNumber, Mode=TwoWay}"/>
+                                    <TextBlock Text="{Binding PhoneError}" Foreground="Red" FontSize="12" MinHeight="24" TextWrapping="Wrap" Margin="0,0,0,0"/>
 
-                                <TextBox Grid.Row="4" Grid.Column="0"
-                                         Header="Phone Number"
-                                         Text="{Binding PhoneError, Mode=TwoWay}"/>
-                                <TextBlock Grid.Row="5" Grid.Column="0" Text="{Binding PhoneError}" Foreground="Red" FontSize="12" MinHeight="24" TextWrapping="Wrap"/>
+                                </StackPanel>
 
-
-                                <TextBox Grid.Row="0" Grid.Column="1"
+                                <TextBox Grid.Row="0" Grid.Column="1" 
                                          Header="Street Name"
-                                         Text="{Binding StreetName, Mode=TwoWay}"/>
-
-                                <TextBox Grid.Row="1" Grid.Column="1"
+                                         Text="{Binding StreetName, Mode=TwoWay}"
+                                         />
+                                <StackPanel Grid.Row="1" Grid.Column="1">
+                                    <TextBox
                                          Header="Street Number"
                                          Text="{Binding StreetNumber, Mode=TwoWay}"/>
-                                <TextBlock Text="{Binding StreetNumberError}" Foreground="Red" FontSize="12" MinHeight="24" TextWrapping="Wrap"/>
-
+                                    <TextBlock  Text="{Binding StreetNumberError}" Foreground="Red" FontSize="12" MinHeight="24" TextWrapping="Wrap"/>
+                                </StackPanel>
 
                                 <TextBox Grid.Row="2" Grid.Column="1"
                                          Header="City"
-                                         Text="{Binding City, Mode=TwoWay}"/>
+                                         Text="{Binding City, Mode=TwoWay}"
+                                         Margin="0,0,0,24"/>
 
                                 <ComboBox Grid.Row="3" Grid.Column="1"
                                           Header="Country"
