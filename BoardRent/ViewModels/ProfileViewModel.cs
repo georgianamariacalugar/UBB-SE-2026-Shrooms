@@ -15,6 +15,7 @@ using Windows.Storage;
 using Windows.Storage.Pickers;
 using Microsoft.UI.Xaml;
 using BoardRent.Views;
+using System.Collections.ObjectModel;
 
 namespace BoardRent.ViewModels
 {
@@ -30,6 +31,8 @@ namespace BoardRent.ViewModels
 
         public ICommand SaveNewPasswordCommand { get; }
 
+        public ICommand SignOutCommand { get; }
+
         public ProfileViewModel(IUserService userService, IAuthService authService)
         {
             _userService = userService;
@@ -38,29 +41,34 @@ namespace BoardRent.ViewModels
             RemoveAvatarCommand = new RelayCommand(async () => await RemoveAvatar());
             UploadAvatarCommand = new RelayCommand(async () => await UploadAvatar());
             SaveNewPasswordCommand = new RelayCommand(async () => await SaveNewPassword());
+            SignOutCommand= new RelayCommand(async () => await SignOut());
             //LoadProfile();
         }
-        public event PropertyChangedEventHandler PropertyChanged;
 
-        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (Equals(storage, value)) return false;
-            storage = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            return true;
-        }
+        public ObservableCollection<string> Countries { get; } = new ObservableCollection<string>{
+            "Romania",
+            "Germany",
+            "France",
+        };
 
         private string _username;
         public string Username { get => _username; set => SetProperty(ref _username, value); }
 
         private string _displayName;
         public string DisplayName { get => _displayName; set => SetProperty(ref _displayName, value); }
+        
+        private string _displayNameError;
+        public string DisplayNameError { get => _displayNameError; set => SetProperty(ref _displayNameError, value); }
+
 
         private string _email;
         public string Email { get => _email; set => SetProperty(ref _email, value); }
 
         private string _phoneNumber;
         public string PhoneNumber { get => _phoneNumber; set => SetProperty(ref _phoneNumber, value); }
+
+        private string _phoneError;
+        public string PhoneError { get => _phoneError; set => SetProperty(ref _phoneError, value); }
 
         private string _country;
         public string Country { get => _country; set => SetProperty(ref _country, value); }
@@ -73,6 +81,10 @@ namespace BoardRent.ViewModels
 
         private string _streetNumber;
         public string StreetNumber { get => _streetNumber; set => SetProperty(ref _streetNumber, value); }
+
+        private string _streetNumberError;
+        public string StreetNumberError { get => _streetNumberError; set => SetProperty(ref _streetNumberError, value); }
+
 
         private string _avatarUrl;
         public string AvatarUrl { get => _avatarUrl; set => SetProperty(ref _avatarUrl, value); }
@@ -89,6 +101,14 @@ namespace BoardRent.ViewModels
         private string _error;
         public string ErrorMessage { get => _error; set => SetProperty(ref _error, value); }
 
+        private string _currentPasswordError;
+        public string CurrentPasswordError { get => _currentPasswordError; set => SetProperty(ref _currentPasswordError, value); }
+
+        private string _newPasswordError;
+        public string NewPasswordError { get => _newPasswordError; set => SetProperty(ref _newPasswordError, value); }
+
+        private string _confirmPasswordError;
+        public string ConfirmPasswordError { get => _confirmPasswordError; set => SetProperty(ref _confirmPasswordError, value); }
         public async Task LoadProfile()
         {
             var userId = SessionContext.GetInstance().UserId;
@@ -133,11 +153,35 @@ namespace BoardRent.ViewModels
 
             if (result.Success)
             {
+                DisplayNameError = "";
+                PhoneError = "";
+                StreetNumberError = "";
                 Debug.WriteLine("Profile updated successfully");
             }
             else
             {
-                Debug.WriteLine("Failed to update profile");
+                var fieldErrors = result.Error.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var fe in fieldErrors)
+                {
+                    var parts = fe.Split('|', 2);
+                    if (parts.Length != 2) continue;
+                    var field = parts[0];
+                    var message = parts[1];
+
+                    switch (field)
+                    {
+                        case "DisplayName":
+                            DisplayNameError = message;
+                            break;
+                        case "PhoneNumber":
+                            PhoneError = message;
+                            break;
+                        case "StreetNumber":
+                            StreetNumberError = message;
+                            break;
+                    }
+                }
             }
         }
 
@@ -177,33 +221,38 @@ namespace BoardRent.ViewModels
         public async Task SignOut()
         {
             await _authService.LogoutAsync();
+            App.NavigateTo(typeof(LoginPage));
 
-            Username = null;
-            DisplayName = null;
-            Email = null;
-            AvatarUrl = null;
         }
 
         public async Task SaveNewPassword()
         {
-            ErrorMessage = "";
+            CurrentPasswordError = NewPasswordError = ConfirmPasswordError = "";
+
+            if (NewPassword != ConfirmPassword)
+            {
+                ConfirmPasswordError = "Passwords don't match";
+                return;
+            }
 
             var userId = SessionContext.GetInstance().UserId;
             var result = await _userService.ChangePasswordAsync(userId, CurrentPassword, NewPassword);
-            CurrentPassword = NewPassword;
 
             if (result.Success)
             {
-                ErrorMessage = "Password updated successfully!";
-                CurrentPassword = NewPassword = ConfirmPassword = ""; 
+                CurrentPassword = NewPassword = ConfirmPassword = "";
+                App.NavigateTo(typeof(LoginPage));
             }
             else
             {
-                ErrorMessage = result.Error ?? "Unknown error occurred";
+                if (result.Error.Contains("incorrect"))
+                    CurrentPasswordError = "Current password is wrong";
+                else if (result.Error.Contains("short"))
+                    NewPasswordError = "Password must contain at least 8 characters";
+                else
+                    ConfirmPasswordError = result.Error;
             }
-            //App.NavigateTo(typeof(LoginPage));
         }
-
 
 
     }

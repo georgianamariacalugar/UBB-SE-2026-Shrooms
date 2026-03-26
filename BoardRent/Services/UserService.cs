@@ -51,11 +51,23 @@ namespace BoardRent.Services
         public async Task<ServiceResult<bool>> UpdateProfileAsync(Guid userId, UserProfileDto dto)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null) throw new Exception("User not found");
 
-            var existing = await _userRepository.GetByEmailAsync(dto.Email);
-            if (existing != null && existing.Id != userId)
-                throw new Exception("Email already in use");
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(dto.DisplayName) || dto.DisplayName.Length < 2 || dto.DisplayName.Length > 50)
+                errors.Add("DisplayName|Display name must be between 2 and 50 characters long");
+
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(dto.PhoneNumber, @"^\+?\d{7,15}$"))
+                    errors.Add("PhoneNumber|Phone number format is invalid");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.StreetNumber) || dto.StreetNumber.Length > 10)
+                errors.Add("StreetNumber|Street number must be a valid value");
+
+            if (errors.Any())
+                return ServiceResult<bool>.Fail(string.Join(";", errors));
 
             user.DisplayName = dto.DisplayName;
             user.Email = dto.Email;
