@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MovieShop (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "MovieShop (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
