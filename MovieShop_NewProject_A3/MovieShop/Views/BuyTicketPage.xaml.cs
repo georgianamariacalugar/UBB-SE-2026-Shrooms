@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using MovieShop.Models;
 using MovieShop.Repositories;
+using MovieShop.Services;
 using Microsoft.UI.Xaml;
 using System;
 
@@ -13,6 +14,7 @@ namespace MovieShop.Views
         private MovieEvent? _event;
         private readonly IEventRepository _eventRepo = App.Services.GetRequiredService<IEventRepository>();
         private readonly IUserRepository _userRepo = App.Services.GetRequiredService<IUserRepository>();
+        private readonly IEventTicketService _ticketService = App.Services.GetRequiredService<IEventTicketService>();
 
         public BuyTicketPage()
         {
@@ -24,40 +26,19 @@ namespace MovieShop.Views
             base.OnNavigatedTo(e);
 
             if (e.Parameter is int id)
-            {
                 _event = _eventRepo.GetEventById(id);
-            }
             else if (e.Parameter is MovieEvent me)
-            {
                 _event = me;
-            }
 
-            if (_event == null)
-                return;
+            if (_event == null) return;
 
             this.DataContext = _event;
-
             UpdateButtonState();
         }
 
         private void UpdateButtonState()
         {
-            var loggedIn = Models.SessionManager.IsLoggedIn;
-            var balance = Models.SessionManager.CurrentUserBalance;
-
-            if (loggedIn)
-            {
-                try
-                {
-                    balance = _userRepo.GetBalance(Models.SessionManager.CurrentUserID);
-                    Models.SessionManager.CurrentUserBalance = balance;
-                }
-                catch
-                {
-                }
-            }
-
-            if (!loggedIn)
+            if (!SessionManager.IsLoggedIn)
             {
                 ConfirmButton.IsEnabled = false;
                 InsufficientText.Text = "You must be signed in to purchase.";
@@ -71,11 +52,12 @@ namespace MovieShop.Views
                 return;
             }
 
-            var insufficient = balance < _event.TicketPrice;
-            ConfirmButton.IsEnabled = !insufficient;
-            if (insufficient)
+            var canBuy = _ticketService.CanBuyTicket(SessionManager.CurrentUserID, _event);
+            ConfirmButton.IsEnabled = canBuy;
+
+            if (!canBuy)
             {
-                InsufficientText.Text = $"Insufficient funds. Balance: {balance:C} — Price: {_event.TicketPrice:C}";
+                InsufficientText.Text = $"Insufficient funds. Balance: {SessionManager.CurrentUserBalance:C} — Price: {_event.TicketPrice:C}";
                 InsufficientText.Visibility = Visibility.Visible;
             }
             else
@@ -84,11 +66,11 @@ namespace MovieShop.Views
             }
         }
 
-        private async void ConfirmButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        private async void ConfirmButton_Click(object sender, RoutedEventArgs e)
         {
             if (_event == null) return;
 
-            if (!Models.SessionManager.IsLoggedIn)
+            if (!SessionManager.IsLoggedIn)
             {
                 var dlg = new ContentDialog
                 {
@@ -102,18 +84,17 @@ namespace MovieShop.Views
                 if (await dlg.ShowAsync() != ContentDialogResult.Primary)
                     return;
 
-                Models.SessionManager.CurrentUserID = 1;
-                Models.SessionManager.CurrentUserBalance = _userRepo.GetBalance(1);
+                SessionManager.CurrentUserID = 1;
+                SessionManager.CurrentUserBalance = _userRepo.GetBalance(1);
                 UpdateButtonState();
                 return;
             }
 
             try
             {
-                // Run the DB work on a background thread to avoid blocking the UI thread
-                await System.Threading.Tasks.Task.Run(() => _eventRepo.PurchaseTicket(Models.SessionManager.CurrentUserID, _event.ID));
+                await System.Threading.Tasks.Task.Run(() =>
+                    _ticketService.PurchaseTicket(SessionManager.CurrentUserID, _event));
 
-                Models.SessionManager.CurrentUserBalance = _userRepo.GetBalance(Models.SessionManager.CurrentUserID);
                 UpdateButtonState();
 
                 var dialog = new ContentDialog
@@ -123,7 +104,6 @@ namespace MovieShop.Views
                     CloseButtonText = "OK",
                     XamlRoot = XamlRoot
                 };
-
                 await dialog.ShowAsync();
 
                 if (this.XamlRoot?.Content is NavigationPage navPage)
