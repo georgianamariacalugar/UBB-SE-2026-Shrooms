@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Windows.UI;
+using MovieShop.Services;
 
 namespace MovieShop.Views;
 
@@ -21,9 +22,9 @@ public sealed partial class MovieDetailPage : Page
 {
     private Movie? _movie;
     private MainViewModel? _mainVm;
-    private readonly IMovieRepository _movieRepo = App.Services.GetRequiredService<IMovieRepository>();
-    private readonly IActiveSalesRepository _activeSalesRepo = App.Services.GetRequiredService<IActiveSalesRepository>();
-    private readonly IDatabaseSingleton _db = App.Services.GetRequiredService<IDatabaseSingleton>();
+   private readonly IMoviePurchaseService _purchaseService = App.Services.GetRequiredService<IMoviePurchaseService>();
+    private readonly IMovieReviewService _reviewService = App.Services.GetRequiredService<IMovieReviewService>();
+    private readonly IMovieCatalogService _movieCatalogService = App.Services.GetRequiredService<IMovieCatalogService>();
 
     public MovieDetailPage()
     {
@@ -43,8 +44,7 @@ public sealed partial class MovieDetailPage : Page
         if (_movie == null)
             return;
 
-        var discountMap = _activeSalesRepo.GetBestDiscountPercentByMovieId();
-        ActiveSalesRepo.ApplyBestDiscountsToMovies(new List<Movie> { _movie }, discountMap);
+        _movieCatalogService.ApplyDiscount(_movie);
 
         TitleBlock.Text = _movie.Title;
         DescriptionBlock.Text = string.IsNullOrEmpty(_movie.Description) ? "—" : _movie.Description;
@@ -54,8 +54,11 @@ public sealed partial class MovieDetailPage : Page
         TrySetPoster(_movie.ImageUrl);
 
         RefreshBuyButtonState();
+        ToolTipService.SetToolTip(
+            ReviewsButton,
+            _reviewService.BuildStarDistributionTooltip(_movie.ID)
+        );
 
-        ToolTipService.SetToolTip(ReviewsButton, BuildStarDistributionTooltip(_movie.ID));
     }
 
     private void UpdatePriceDisplay()
@@ -97,43 +100,17 @@ public sealed partial class MovieDetailPage : Page
             return;
 
         _mainVm?.RefreshBalanceFromDatabase();
-        var userId = SessionManager.CurrentUserID;
-        var loggedIn = SessionManager.IsLoggedIn;
-        var owned = _movieRepo.UserOwnsMovie(userId, _movie.ID);
-        var balance = _mainVm?.Balance ?? SessionManager.CurrentUserBalance;
+        var props = _purchaseService.GetBuyButtonProps(
+        _movie,
+        SessionManager.CurrentUserID,
+        SessionManager.IsLoggedIn,
+        _mainVm?.Balance ?? SessionManager.CurrentUserBalance
+    );
 
-        var insufficient = loggedIn && !owned && balance < _movie.GetEffectivePrice();
-
-        if (owned)
-        {
-            BuyMovieButton.Content = "Owned";
-            BuyMovieButton.IsEnabled = false;
-            ToolTipService.SetToolTip(BuyMovieButton, null);
-            BuyMovieButton.Opacity = 1;
-            return;
-        }
-
-        BuyMovieButton.Content = "Buy movie";
-
-        if (!loggedIn)
-        {
-            BuyMovieButton.IsEnabled = false;
-            ToolTipService.SetToolTip(BuyMovieButton, "You must be logged in to make a purchase.");
-            BuyMovieButton.Opacity = 0.55;
-            return;
-        }
-
-        if (insufficient)
-        {
-            BuyMovieButton.IsEnabled = false;
-            ToolTipService.SetToolTip(BuyMovieButton, "Your balance is too low to purchase this movie.");
-            BuyMovieButton.Opacity = 0.55;
-            return;
-        }
-
-        BuyMovieButton.IsEnabled = true;
-        ToolTipService.SetToolTip(BuyMovieButton, null);
-        BuyMovieButton.Opacity = 1;
+        BuyMovieButton.Content = props.Content;
+        BuyMovieButton.IsEnabled = props.IsEnabled;
+        BuyMovieButton.Opacity = props.Opacity;
+        ToolTipService.SetToolTip(BuyMovieButton, props.ToolTip);
     }
 
     private async void BuyMovieButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -163,9 +140,8 @@ public sealed partial class MovieDetailPage : Page
 
         try
         {
-            await Task.Run(() => _movieRepo.PurchaseMovie(SessionManager.CurrentUserID, _movie.ID, _movie.GetEffectivePrice()));
+            _purchaseService.PurchaseMovie(SessionManager.CurrentUserID, _movie);
 
-            // Refresh balance in nav bar AND reload wallet transaction list
             _mainVm.RefreshWallet();
             SessionManager.CurrentUserBalance = _mainVm.Balance;
 
@@ -237,63 +213,5 @@ public sealed partial class MovieDetailPage : Page
         }
     }
 
-    private int GetReviewCount(int movieId)
-    {
-        _db.OpenConnection();
 
-        try
-        {
-            const string query = @"SELECT StarRating FROM Reviews WHERE MovieID = @mid";
-            using var cmd = new SqlCommand(query, _db.Connection);
-            cmd.Parameters.AddWithValue("@mid", movieId);
-
-            using var reader = cmd.ExecuteReader();
-            var count = 0;
-            while (reader.Read())
-                count++;
-
-            return count;
-        }
-        finally
-        {
-            _db.CloseConnection();
-        }
-    }
-
-    private string BuildStarDistributionTooltip(int movieId)
-    {
-        var counts = new int[11];
-
-        _db.OpenConnection();
-        try
-        {
-            const string query = @"SELECT StarRating FROM Reviews WHERE MovieID = @mid";
-            using var cmd = new SqlCommand(query, _db.Connection);
-            cmd.Parameters.AddWithValue("@mid", movieId);
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var rating = reader.GetInt32(0);
-                var bucket = (int)decimal.Floor(rating);
-                if (bucket < 1) bucket = 1;
-                if (bucket > 10) bucket = 10;
-                counts[bucket]++;
-            }
-        }
-        finally
-        {
-            _db.CloseConnection();
-        }
-
-        var total = 0;
-        for (var i = 1; i <= 10; i++) total += counts[i];
-        if (total == 0) return "No reviews yet.";
-
-        var lines = new List<string> { "Rating distribution:" };
-        for (var i = 10; i >= 1; i--)
-            lines.Add($"{i}: {counts[i]}");
-
-        return string.Join("\n", lines);
-    }
 }

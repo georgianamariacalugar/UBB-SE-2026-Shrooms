@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using MovieShop.Repositories;
+using MovieShop.Services;
 using MovieShop.ViewModels;
 using System;
 
@@ -40,6 +41,10 @@ namespace MovieShop
             services.AddTransient<IReviewRepository, ReviewRepo>();
             services.AddTransient<ITransactionRepository, TransactionRepo>();
             services.AddTransient<IInventoryRepository, InventoryRepo>();
+
+            services.AddTransient<IMoviePurchaseService, MoviePurchaseService>();
+            services.AddTransient<IMovieReviewService, MovieReviewService>();
+            services.AddTransient<IMovieCatalogService, MovieCatalogService>();
 
             services.AddTransient<MainViewModel>();
             services.AddTransient<MarketplaceViewModel>();
