@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MovieShop.Models;
 
 namespace MovieShop.Services
 {
     public interface IMovieReviewService
     {
+        List<MovieReview> GetReviewsForMovie(int movieId);
         int GetReviewCount(int movieId);
         Dictionary<int, int> GetReviewCounts(IEnumerable<int> movieIds);
         string BuildStarDistributionTooltip(int movieId);

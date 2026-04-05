@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using MovieShop.Services;
+using MovieShop.Models;
 
 public class MovieReviewService : IMovieReviewService
 {
@@ -18,6 +19,10 @@ public class MovieReviewService : IMovieReviewService
         _reviewRepo = reviewRepo;
     }
 
+    public List<MovieReview> GetReviewsForMovie(int movieId)
+    {
+        return _reviewRepo.GetReviewsForMovie(movieId);
+    }
     public int GetReviewCount(int movieId)
     {
         _db.OpenConnection();
