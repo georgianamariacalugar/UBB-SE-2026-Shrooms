@@ -3,7 +3,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using MovieShop.Repositories;
 using MovieShop.Models;
+using MovieShop.Services;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace MovieShop.Views
 {
@@ -11,6 +13,7 @@ namespace MovieShop.Views
     {
         private readonly IInventoryRepository _repo = App.Services.GetRequiredService<IInventoryRepository>();
         private readonly IUserRepository _userRepo = App.Services.GetRequiredService<IUserRepository>();
+        private readonly IInventoryService _inventoryService = App.Services.GetRequiredService<IInventoryService>();
 
         public InventoryView()
         {
@@ -43,6 +46,9 @@ namespace MovieShop.Views
         }
 
         private async void RemoveMovie_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+            => await RemoveMovieAsync(sender);
+
+        private async Task RemoveMovieAsync(object sender)
         {
             if (sender is Microsoft.UI.Xaml.FrameworkElement fe && fe.DataContext is Movie m)
             {
@@ -55,18 +61,17 @@ namespace MovieShop.Views
                     XamlRoot = XamlRoot
                 };
 
+                MoviesGrid.ItemsSource = _inventoryService.RemoveMovie(SessionManager.CurrentUserID, m.ID);
 
-                _repo.RemoveOwnedMovie(SessionManager.CurrentUserID, m.ID);
-
-                // Refresh UI
-                MoviesGrid.ItemsSource = _repo.GetOwnedMovies(SessionManager.CurrentUserID);
-                // Refresh wallet/nav state in case needed
                 if (this.XamlRoot?.Content is NavigationPage navPage)
                     navPage.ViewModel.RefreshWallet();
             }
         }
 
         private async void RemoveTicket_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+            => await RemoveTicketAsync(sender);
+
+        private async Task RemoveTicketAsync(object sender)
         {
             if (sender is Microsoft.UI.Xaml.FrameworkElement fe && fe.DataContext is MovieEvent ev)
             {
@@ -79,10 +84,8 @@ namespace MovieShop.Views
                     XamlRoot = XamlRoot
                 };
 
+                TicketsGrid.ItemsSource = _inventoryService.RemoveTicket(SessionManager.CurrentUserID, ev.ID);
 
-                _repo.RemoveOwnedTicket(SessionManager.CurrentUserID, ev.ID);
-
-                TicketsGrid.ItemsSource = _repo.GetOwnedTickets(SessionManager.CurrentUserID);
                 if (this.XamlRoot?.Content is NavigationPage navPage)
                     navPage.ViewModel.RefreshWallet();
             }

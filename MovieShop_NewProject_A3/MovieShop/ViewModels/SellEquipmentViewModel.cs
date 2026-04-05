@@ -1,4 +1,7 @@
-﻿using System;
+﻿using MovieShop.Models;
+using MovieShop.Repositories;
+using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -6,7 +9,8 @@ namespace MovieShop.ViewModels
 {
     public class SellEquipmentViewModel : INotifyPropertyChanged
     {
-        
+        private readonly IEquipmentRepository _repo = App.Services.GetRequiredService<IEquipmentRepository>();
+
         private string _newItemTitle = string.Empty;
         private string _newItemDesc = string.Empty;
         private string _priceInput = string.Empty;
@@ -26,17 +30,10 @@ namespace MovieShop.ViewModels
             set { _newItemDesc = value; OnPropertyChanged(); ValidateForm(); }
         }
 
-
-        // 3. Input-ul de pret (ce scrie utilizatorul în casuta)
         public string PriceInput
         {
             get => _priceInput;
-            set
-            {
-                _priceInput = value;
-                ValidateForm();
-                OnPropertyChanged();
-            }
+            set { _priceInput = value; OnPropertyChanged(); ValidateForm(); }
         }
 
         public string PriceErrorMessage
@@ -52,6 +49,23 @@ namespace MovieShop.ViewModels
         }
 
         public decimal ValidatedPrice => _validatedPrice;
+
+        public void SubmitListing(string? category, string? condition, string imageUrl)
+        {
+            var newItem = new Equipment
+            {
+                SellerID = SessionManager.CurrentUserID,
+                Title = NewItemTitle,
+                Description = NewItemDesc,
+                Price = ValidatedPrice,
+                Category = category,
+                Condition = condition,
+                ImageUrl = imageUrl,
+                Status = EquipmentStatus.Available
+            };
+
+            _repo.ListItem(newItem);
+        }
 
         private void ValidateForm()
         {
@@ -76,18 +90,16 @@ namespace MovieShop.ViewModels
             {
                 _validatedPrice = result;
                 PriceErrorMessage = string.Empty;
-                CanPost = true; 
+                CanPost = true;
             }
             else
             {
-                CanPost = false; 
+                CanPost = false;
             }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

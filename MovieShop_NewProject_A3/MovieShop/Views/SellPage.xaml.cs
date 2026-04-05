@@ -1,8 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using MovieShop.Models;
-using MovieShop.Repositories;
 using MovieShop.ViewModels;
 using System;
 using Windows.Storage.Pickers;
@@ -13,7 +10,6 @@ namespace MovieShop.Views
 {
     public sealed partial class SellPage : Page
     {
-        private readonly IEquipmentRepository _repo = App.Services.GetRequiredService<IEquipmentRepository>();
         public SellEquipmentViewModel ViewModel { get; set; } = new SellEquipmentViewModel();
         private string _selectedLocalPath = string.Empty;
 
@@ -46,41 +42,48 @@ namespace MovieShop.Views
             }
         }
 
-        private void SubmitButton_Click(object sender, RoutedEventArgs e)
+        private async void SubmitButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var newItem = new Equipment
-                {
-                    SellerID = SessionManager.CurrentUserID,
-                    Title = ViewModel.NewItemTitle,
-                    Description = ViewModel.NewItemDesc,
-                    Price = ViewModel.ValidatedPrice,
-                    Category = (CategoryInput.SelectedItem as ComboBoxItem)?.Content.ToString(),
-                    Condition = (ConditionInput.SelectedItem as ComboBoxItem)?.Content.ToString(),
-                    ImageUrl = !string.IsNullOrEmpty(_selectedLocalPath) ? _selectedLocalPath : ImageUrlInput.Text,
-                    Status = EquipmentStatus.Available
-                };
+                var category = (CategoryInput.SelectedItem as ComboBoxItem)?.Content.ToString();
+                var condition = (ConditionInput.SelectedItem as ComboBoxItem)?.Content.ToString();
+                var imageUrl = !string.IsNullOrEmpty(_selectedLocalPath) ? _selectedLocalPath : ImageUrlInput.Text;
 
-                _repo.ListItem(newItem);
+                ViewModel.SubmitListing(category, condition, imageUrl);
 
                 if (this.Parent is ContentControl contentArea)
-                {
                     contentArea.Content = new StartPageEquipment();
-                }
+            } 
+            catch (ArgumentException ex)
+            {
+                var dlg = new ContentDialog
+                {
+                    Title = "Validation error",
+                    Content = ex.Message,
+                    CloseButtonText = "OK",
+                    XamlRoot = XamlRoot
+                };
+                await dlg.ShowAsync();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Eroare la salvare: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine($"[SellPage] SubmitListing failed: {ex}");
+                var dlg = new ContentDialog
+                {
+                    Title = "Error",
+                    Content = "Could not list the item. Please try again.",
+                    CloseButtonText = "OK",
+                    XamlRoot = XamlRoot
+                };
+                await dlg.ShowAsync();
             }
         }
 
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
             if (this.Parent is ContentControl contentArea)
-            {
                 contentArea.Content = new StartPageEquipment();
-            }
         }
     }
 }

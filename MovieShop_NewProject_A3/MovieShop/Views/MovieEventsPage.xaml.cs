@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using MovieShop.Models;
 using MovieShop.Repositories;
+using MovieShop.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,28 +11,28 @@ using Microsoft.UI.Xaml;
 
 namespace MovieShop.Views;
 
-    public sealed partial class MovieEventsPage : Page
+public sealed partial class MovieEventsPage : Page
 {
     private Movie? _movie;
     private List<MovieEvent>? _allEvents;
     private readonly IEventRepository _eventRepo = App.Services.GetRequiredService<IEventRepository>();
     private readonly IUserRepository _userRepo = App.Services.GetRequiredService<IUserRepository>();
+    private readonly IEventTicketService _ticketService = App.Services.GetRequiredService<IEventTicketService>();
 
-        private static object? FindDescendantByName(DependencyObject parent, string name)
+    private static object? FindDescendantByName(DependencyObject parent, string name)
+    {
+        if (parent == null) return null;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
         {
-            if (parent == null) return null;
-            var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
-            {
-                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is FrameworkElement fe && fe.Name == name)
-                    return fe;
-                var found = FindDescendantByName(child, name);
-                if (found != null)
-                    return found;
-            }
-            return null;
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is FrameworkElement fe && fe.Name == name)
+                return fe;
+            var found = FindDescendantByName(child, name);
+            if (found != null) return found;
         }
+        return null;
+    }
 
     public MovieEventsPage()
     {
@@ -39,10 +40,8 @@ namespace MovieShop.Views;
         this.Loaded += MovieEventsPage_Loaded;
     }
 
-    private void MovieEventsPage_Loaded(object? sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void MovieEventsPage_Loaded(object? sender, RoutedEventArgs e)
     {
-        // If the page was created directly (e.g. from the main nav) OnNavigatedTo won't be called.
-        // In that case load all events so the Tickets nav shows content.
         if (EventsList.ItemsSource == null)
         {
             TitleBlock.Text = "Events";
@@ -52,28 +51,24 @@ namespace MovieShop.Views;
         }
     }
 
-    private void SearchBox_TextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e)
-    {
-        ApplyFilters();
-    }
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilters();
 
-    private void FilterCombo_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
-    {
-        ApplyFilters();
-    }
+    private void FilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilters();
 
     private void ApplyFilters()
     {
-        if (_allEvents == null)
-            return;
+        if (_allEvents == null) return;
 
         var filtered = _allEvents.AsEnumerable();
 
         var search = SearchBox?.Text?.Trim();
         if (!string.IsNullOrWhiteSpace(search))
-            filtered = filtered.Where(ev => (ev.Title ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 || (ev.Description ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 || (ev.Location ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
+            filtered = filtered.Where(ev =>
+                (ev.Title ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (ev.Description ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (ev.Location ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
 
-        var sel = (FilterCombo?.SelectedItem as Microsoft.UI.Xaml.Controls.ComboBoxItem)?.Content as string ?? "All";
+        var sel = (FilterCombo?.SelectedItem as ComboBoxItem)?.Content as string ?? "All";
         if (sel == "Upcoming")
             filtered = filtered.Where(ev => ev.Date >= DateTime.Now);
         else if (sel == "Past")
@@ -85,35 +80,19 @@ namespace MovieShop.Views;
 
     private void UpdateBuyButtons()
     {
-        // Ensure buttons are disabled when user not logged in or insufficient funds
         var userId = SessionManager.CurrentUserID;
-        var balance = userId > 0 ? _userRepo.GetBalance(userId) : 0m;
 
         foreach (var item in EventsList.Items)
         {
             var lvi = EventsList.ContainerFromItem(item) as ListViewItem;
             if (lvi == null) continue;
-            var btnObj = FindDescendantByName(lvi, "BuyTicketButton") as Button;
-            if (btnObj == null) continue;
+            var btn = FindDescendantByName(lvi, "BuyTicketButton") as Button;
+            if (btn == null) continue;
 
             var ev = item as MovieEvent;
-            if (ev == null)
-            {
-                btnObj.IsEnabled = false;
-                btnObj.Opacity = 0.5;
-                continue;
-            }
-
-            if (userId <= 0 || balance < ev.TicketPrice)
-            {
-                btnObj.IsEnabled = false;
-                btnObj.Opacity = 0.55;
-            }
-            else
-            {
-                btnObj.IsEnabled = true;
-                btnObj.Opacity = 1;
-            }
+            var canBuy = ev != null && _ticketService.CanBuyTicket(userId, ev);
+            btn.IsEnabled = canBuy;
+            btn.Opacity = canBuy ? 1.0 : 0.55;
         }
     }
 
@@ -121,105 +100,106 @@ namespace MovieShop.Views;
     {
         base.OnNavigatedTo(e);
 
-        if (e.Parameter is not MovieEventsNavArgs args)
-            return;
+        if (e.Parameter is not MovieEventsNavArgs args) return;
 
         _movie = args.Movie;
         if (_movie == null)
         {
             TitleBlock.Text = "Events";
-            var eventsAll = _eventRepo.GetAllEvents();
-            EventsList.ItemsSource = eventsAll;
+            _allEvents = _eventRepo.GetAllEvents();
+            EventsList.ItemsSource = _allEvents;
             return;
         }
 
         TitleBlock.Text = $"Events - {_movie.Title}";
-        var events = _eventRepo.GetEventsForMovie(_movie.ID);
-        EventsList.ItemsSource = events;
+        _allEvents = _eventRepo.GetEventsForMovie(_movie.ID);
+        EventsList.ItemsSource = _allEvents;
     }
 
-    private void BackButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void BackButton_Click(object sender, RoutedEventArgs e)
     {
         if (Frame?.CanGoBack == true)
             Frame.GoBack();
     }
 
-    private async void BuyTicket_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void BuyTicket_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Microsoft.UI.Xaml.FrameworkElement fe && fe.DataContext is MovieEvent me)
+        if (sender is not FrameworkElement fe || fe.DataContext is not MovieEvent me)
+            return;
+
+        if (!SessionManager.IsLoggedIn)
         {
-            if (!Models.SessionManager.IsLoggedIn)
+            var dlg = new ContentDialog
             {
-                var dlg = new ContentDialog
-                {
-                    Title = "Sign in",
-                    Content = "Please sign in to continue.",
-                    PrimaryButtonText = "Sign in",
-                    CloseButtonText = "Cancel",
-                    XamlRoot = XamlRoot
-                };
+                Title = "Sign in",
+                Content = "Please sign in to continue.",
+                PrimaryButtonText = "Sign in",
+                CloseButtonText = "Cancel",
+                XamlRoot = XamlRoot
+            };
 
-                if (await dlg.ShowAsync() != ContentDialogResult.Primary)
-                    return;
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary)
+                return;
 
-                Models.SessionManager.CurrentUserID = 1;
-                try
-                {
-                    Models.SessionManager.CurrentUserBalance = _userRepo.GetBalance(1);
-                }
-                catch
-                {
-                    Models.SessionManager.CurrentUserBalance = 0m;
-                }
-                UpdateBuyButtons();
-            }
-
+            SessionManager.CurrentUserID = 1;
             try
             {
-                _eventRepo.PurchaseTicket(Models.SessionManager.CurrentUserID, me.ID);
-
-                Models.SessionManager.CurrentUserBalance = _userRepo.GetBalance(Models.SessionManager.CurrentUserID);
-                UpdateBuyButtons();
-
-                var dialog = new ContentDialog
-                {
-                    Title = "Purchase successful",
-                    Content = $"Ticket for '{me.Title}' purchased and added to your library.",
-                    CloseButtonText = "OK",
-                    XamlRoot = XamlRoot
-                };
-
-                await dialog.ShowAsync();
-
-                if (this.XamlRoot?.Content is NavigationPage navPage)
-                {
-                    navPage.ViewModel.RefreshWallet();
-                    navPage.ViewModel.CurrentViewModel = "Inventory";
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                var err = new ContentDialog
-                {
-                    Title = "Cannot complete purchase",
-                    Content = ex.Message,
-                    CloseButtonText = "OK",
-                    XamlRoot = XamlRoot
-                };
-                await err.ShowAsync();
+                SessionManager.CurrentUserBalance = _userRepo.GetBalance(1);
             }
             catch (Exception ex)
             {
-                var err = new ContentDialog
-                {
-                    Title = "Error",
-                    Content = "An unexpected error occurred: " + ex.Message,
-                    CloseButtonText = "OK",
-                    XamlRoot = XamlRoot
-                };
-                await err.ShowAsync();
+                System.Diagnostics.Debug.WriteLine($"[MovieEventsPage] Failed to fetch balance after login: {ex.Message}");
+                SessionManager.CurrentUserBalance = 0m;
             }
+
+            UpdateBuyButtons();
+            return; // let the user click Buy again after signing in
+        }
+
+        try
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+                _ticketService.PurchaseTicket(SessionManager.CurrentUserID, me));
+
+            UpdateBuyButtons();
+
+            var dialog = new ContentDialog
+            {
+                Title = "Purchase successful",
+                Content = $"Ticket for '{me.Title}' purchased and added to your library.",
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot
+            };
+            await dialog.ShowAsync();
+
+            if (this.XamlRoot?.Content is NavigationPage navPage)
+            {
+                navPage.ViewModel.RefreshWallet();
+                navPage.ViewModel.CurrentViewModel = "Inventory";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            var err = new ContentDialog
+            {
+                Title = "Cannot complete purchase",
+                Content = ex.Message,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot
+            };
+            await err.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MovieEventsPage] Unexpected purchase error: {ex}");
+            var err = new ContentDialog
+            {
+                Title = "Error",
+                Content = "An unexpected error occurred: " + ex.Message,
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot
+            };
+            await err.ShowAsync();
         }
     }
 }
-
