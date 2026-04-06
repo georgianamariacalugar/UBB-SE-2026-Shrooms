@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using MovieShop.Models;
 using MovieShop.Repositories;
-using MovieShop.ViewModels;
+using MovieShop.Services;
 using System;
 using System.Linq;
 
@@ -11,8 +11,7 @@ namespace MovieShop.Views
 {
     public sealed partial class EquipmentDetailPage : Page
     {
-        private readonly IEquipmentRepository _repo = App.Services.GetRequiredService<IEquipmentRepository>();
-        private readonly IUserRepository _userRepo = App.Services.GetRequiredService<IUserRepository>();
+        private readonly IEquipmentPurchaseService _purchaseService = App.Services.GetRequiredService<IEquipmentPurchaseService>();
         private Equipment _selectedItem;
 
         public EquipmentDetailPage(Equipment item)
@@ -38,18 +37,17 @@ namespace MovieShop.Views
                 {
                     ItemImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(_selectedItem.ImageUrl));
                 }
-                catch { }
+                catch (UriFormatException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[EquipmentDetailPage] Invalid image URL '{_selectedItem.ImageUrl}': {ex.Message}");
+                }
             }
 
-            // Always fetch balance from DB so the check is never based on a stale cached value.
-            var currentBalance = _userRepo.GetBalance(SessionManager.CurrentUserID);
-            SessionManager.CurrentUserBalance = currentBalance;
-
-            bool canAfford = currentBalance >= _selectedItem.Price;
+            var canAfford = _purchaseService.CanAfford(SessionManager.CurrentUserID, _selectedItem.Price);
             ConfirmBuyButton.IsEnabled = canAfford;
             ErrorText.Visibility = canAfford ? Visibility.Collapsed : Visibility.Visible;
             if (!canAfford)
-                ErrorText.Text = $"Insufficient funds. Balance: {currentBalance:C} — Price: {_selectedItem.Price:C}";
+                ErrorText.Text = $"Insufficient funds. Balance: {SessionManager.CurrentUserBalance:C} — Price: {_selectedItem.Price:C}";
         }
 
         private void BuyButton_Click(object sender, RoutedEventArgs e) => ShippingModal.Visibility = Visibility.Visible;
@@ -79,20 +77,17 @@ namespace MovieShop.Views
 
             try
             {
-                _repo.PurchaseEquipment(
+                _purchaseService.PurchaseEquipment(
                     _selectedItem.ID,
                     SessionManager.CurrentUserID,
                     _selectedItem.Price,
-                    ModalAddressInput.Text
-                );
+                    ModalAddressInput.Text);
 
-                // Refresh nav bar balance and wallet transaction list.
-                if (App._window.Content is NavigationPage navPage)
+                if (App._window?.Content is NavigationPage navPage)
                     navPage.ViewModel.RefreshWallet();
 
                 ShippingModal.Visibility = Visibility.Collapsed;
 
-                // Show success message before navigating away.
                 var dialog = new ContentDialog
                 {
                     Title = "Purchase successful",
@@ -106,8 +101,14 @@ namespace MovieShop.Views
                 if (this.Parent is ContentControl contentArea)
                     contentArea.Content = new MarketplacePage();
             }
+            catch (InvalidOperationException ex)
+            {
+                ModalErrorText.Text = ex.Message;
+                ModalErrorText.Visibility = Visibility.Visible;
+            }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[EquipmentDetailPage] Unexpected purchase error: {ex}");
                 ModalErrorText.Text = "Transaction failed: " + ex.Message;
                 ModalErrorText.Visibility = Visibility.Visible;
             }

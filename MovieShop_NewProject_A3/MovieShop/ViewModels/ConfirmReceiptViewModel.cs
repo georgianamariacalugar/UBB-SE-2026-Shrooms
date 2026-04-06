@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel;
 using MovieShop.Models;
+using MovieShop.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MovieShop.ViewModels
 {
@@ -10,6 +12,7 @@ namespace MovieShop.ViewModels
         private void OnPropertyChanged(string name) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        private readonly IUserRepository _userRepo = App.Services.GetRequiredService<IUserRepository>();
         private int _currentUserID;
 
         private Transaction _transaction;
@@ -92,7 +95,6 @@ namespace MovieShop.ViewModels
             }
 
             ReleaseEscrowToSeller();
-
             UpdateTransactionStatus("Completed");
 
             IsConfirmButtonVisible = false;
@@ -102,18 +104,21 @@ namespace MovieShop.ViewModels
 
         private void ReleaseEscrowToSeller()
         {
-            if (Transaction.SellerID!= null)
-            {
-                SellerBalance += Transaction.Amount;
-                // TODO: call UserRepository.UpdateBalance(Transaction.SellerID.Value, SellerBalance)
-            }
+            if (Transaction.SellerID == null) return;
+
+            var currentBalance = _userRepo.GetBalance(Transaction.SellerID.ID);
+            var newBalance = currentBalance + Transaction.Amount;
+            _userRepo.UpdateBalance(Transaction.SellerID.ID, newBalance);
+            SellerBalance = newBalance;
         }
 
         private void UpdateTransactionStatus(string newStatus)
         {
             Transaction.Status = newStatus;
             OnPropertyChanged(nameof(Transaction));
-            // TODO: call TransactionRepository.UpdateStatus(Transaction.TransactionID, newStatus)
+            System.Diagnostics.Debug.WriteLine(
+                $"[ConfirmReceiptViewModel] Status set to '{newStatus}' locally. " +
+                "Add UpdateStatus to ITransactionRepository to persist to DB.");
         }
 
         private void DismissSuccess()

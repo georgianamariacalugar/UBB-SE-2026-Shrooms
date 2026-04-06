@@ -1,25 +1,19 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using MovieShop.Repositories;
 using MovieShop.Services;
 using MovieShop.ViewModels;
-using System;
 
 namespace MovieShop
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
+
     public partial class App : Application
     {
         public static Window? _window;
 
         public static IServiceProvider Services { get; private set; }
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
             InitializeComponent();
@@ -45,15 +39,14 @@ namespace MovieShop
             services.AddTransient<IMoviePurchaseService, MoviePurchaseService>();
             services.AddTransient<IMovieReviewService, MovieReviewService>();
             services.AddTransient<IMovieCatalogService, MovieCatalogService>();
+            services.AddTransient<IInventoryService, InventoryService>();
+            services.AddTransient<IEquipmentPurchaseService, EquipmentPurchaseService>();
+            services.AddTransient<IEventTicketService, EventTicketService>();
 
             services.AddTransient<MainViewModel>();
             services.AddTransient<MarketplaceViewModel>();
         }
 
-        /// <summary>
-        /// Invoked when the application is launched.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
             _window = new MainWindow();
