@@ -6,6 +6,7 @@ using MovieShop.ViewModels;
 using MovieShop.Repositories;
 using System;
 using System.Globalization;
+using MovieShop.Services;
 
 namespace MovieShop.Views;
 
@@ -13,7 +14,7 @@ public sealed partial class MovieReviewsPage : Page
 {
     private Movie? _movie;
     private MainViewModel? _mainVm;
-    private readonly IReviewRepository _reviewRepo = App.Services.GetRequiredService<IReviewRepository>();
+    private readonly IMovieReviewService _reviewService = App.Services.GetRequiredService<IMovieReviewService>();
 
     public MovieReviewsPage()
     {
@@ -46,7 +47,7 @@ public sealed partial class MovieReviewsPage : Page
         if (_movie == null)
             return;
 
-        ReviewsList.ItemsSource = _reviewRepo.GetReviewsForMovie(_movie.ID);
+        ReviewsList.ItemsSource = _reviewService.GetReviewsForMovie(_movie.ID);
     }
 
     private async void AddReviewButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -92,7 +93,12 @@ public sealed partial class MovieReviewsPage : Page
                 continue;
             }
 
-            _reviewRepo.AddReview(_movie.ID, SessionManager.CurrentUserID, rating, commentBox.Text);
+            _reviewService.AddReview(
+                _movie.ID,
+                SessionManager.CurrentUserID,
+                rating,
+                commentBox.Text
+            );
             LoadReviews();
             return;
         }

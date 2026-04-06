@@ -36,6 +36,9 @@ namespace MovieShop
             services.AddTransient<ITransactionRepository, TransactionRepo>();
             services.AddTransient<IInventoryRepository, InventoryRepo>();
 
+            services.AddTransient<IMoviePurchaseService, MoviePurchaseService>();
+            services.AddTransient<IMovieReviewService, MovieReviewService>();
+            services.AddTransient<IMovieCatalogService, MovieCatalogService>();
             services.AddTransient<IInventoryService, InventoryService>();
             services.AddTransient<IEquipmentPurchaseService, EquipmentPurchaseService>();
             services.AddTransient<IEventTicketService, EventTicketService>();

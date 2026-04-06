@@ -1,12 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
-using Microsoft.Data.SqlClient;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI;
 using MovieShop.Models;
-using MovieShop.Repositories;
 using MovieShop.ViewModels;
 using MovieShop.Services;
 using System.Collections.Generic;
@@ -48,9 +46,7 @@ public sealed class MovieCatalogItem
 
 public sealed partial class MovieCatalogPage : Page
 {
-    private readonly IMovieRepository _movieRepo = App.Services.GetRequiredService<IMovieRepository>();
-    private readonly IActiveSalesRepository _salesRepo = App.Services.GetRequiredService<IActiveSalesRepository>();
-    private readonly IDatabaseSingleton _db = App.Services.GetRequiredService<IDatabaseSingleton>();
+    private readonly IMovieCatalogService _catalogService = App.Services.GetRequiredService<IMovieCatalogService>();
     private List<Movie> _sourceMovies = new();
     private Dictionary<int, int> _reviewCountByMovieId = new();
     private MainViewModel? _mainVm;
@@ -73,10 +69,8 @@ public sealed partial class MovieCatalogPage : Page
             _showOnlySales = args.ShowOnlySales;
         }
 
-        // Only discounted movies should be shown on this page.
         LoadDiscountedMovies();
 
-        // Subscribe so we can deactivate the catalog when the flash sale ends.
         if (_flashSaleVm != null)
             _flashSaleVm.PropertyChanged -= FlashSaleVm_PropertyChanged!;
         _flashSaleVm = SaleService.CurrentSale;
@@ -109,8 +103,7 @@ public sealed partial class MovieCatalogPage : Page
         else if (SortLowRating.IsChecked == true) list = list.OrderBy(m => m.Rating);
         else list = list.OrderBy(m => m.Title);
 
-        var orderedMovies = list.ToList();
-        MoviesGrid.ItemsSource = orderedMovies
+        MoviesGrid.ItemsSource = list
             .Select(m => new MovieCatalogItem(m, _reviewCountByMovieId.TryGetValue(m.ID, out var c) ? c : 0))
             .ToList();
     }
@@ -137,27 +130,18 @@ public sealed partial class MovieCatalogPage : Page
     {
         if (e.ClickedItem is not MovieCatalogItem item || _mainVm == null) return;
 
-        var movie = item.Movie;
         Frame?.Navigate(typeof(MovieDetailPage), new MovieDetailNavArgs
         {
-            Movie = movie,
+            Movie = item.Movie,
             MainViewModel = _mainVm
         });
     }
 
     private void LoadDiscountedMovies()
     {
-        var all = _movieRepo.GetAllMovies();
-        var discountMap = _salesRepo.GetBestDiscountPercentByMovieId();
-        ActiveSalesRepo.ApplyBestDiscountsToMovies(all, discountMap);
-        _reviewCountByMovieId = GetReviewCounts(all.Select(m => m.ID).Distinct().ToList());
-
-        var onSaleIds = _salesRepo.GetCurrentSales()
-                                  .Select(s => s.Movie.ID)
-                                  .Distinct()
-                                  .ToHashSet();
-
-        _sourceMovies = all.Where(m => onSaleIds.Contains(m.ID)).ToList();
+        var (movies, reviewCounts) = _catalogService.GetDiscountedMovies();
+        _sourceMovies = movies;
+        _reviewCountByMovieId = reviewCounts;
     }
 
     private void FlashSaleVm_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -187,46 +171,9 @@ public sealed partial class MovieCatalogPage : Page
             return;
         }
 
-        // Flash sale ended: remove movies and show message.
         MoviesGrid.ItemsSource = null;
         _sourceMovies = new List<Movie>();
         FlashSaleEndedText.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
         MoviesGrid.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
-    }
-
-    private Dictionary<int, int> GetReviewCounts(IReadOnlyList<int> movieIds)
-    {
-        var result = new Dictionary<int, int>();
-        if (movieIds.Count == 0) return result;
-
-        _db.OpenConnection();
-
-        try
-        {
-            var paramNames = movieIds.Select((_, i) => $"@id{i}").ToArray();
-            var inClause = string.Join(",", paramNames);
-            // Fetch raw review rows; compute counts in code.
-            var query = $@"SELECT MovieID
-                            FROM Reviews
-                            WHERE MovieID IN ({inClause})";
-
-            using var cmd = new SqlCommand(query, _db.Connection);
-            for (var i = 0; i < movieIds.Count; i++)
-                cmd.Parameters.AddWithValue(paramNames[i], movieIds[i]);
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var movieId = reader.GetInt32(0);
-                result.TryGetValue(movieId, out var cnt);
-                result[movieId] = cnt + 1;
-            }
-        }
-        finally
-        {
-            _db.CloseConnection();
-        }
-
-        return result;
     }
 }

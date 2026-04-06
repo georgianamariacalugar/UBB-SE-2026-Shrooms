@@ -162,30 +162,32 @@ namespace MovieShop.Repositories
                 return;
 
             var ids = movies.Select(m => m.ID).Distinct().ToList();
-            var ratingsByMovieId = new Dictionary<int, List<decimal>>();
 
-            // Fetch raw review stars; compute averages in code (no AVG/COUNT in SQL).
             var paramNames = ids.Select((_, i) => $"@id{i}").ToArray();
             var inClause = string.Join(",", paramNames);
-            var query = $@"SELECT MovieID, StarRating FROM Reviews WHERE MovieID IN ({inClause})";
+
+            var query = $@"SELECT MovieID, AVG(CAST(StarRating AS FLOAT)) AS AvgRating, COUNT(*) AS ReviewCount
+            FROM Reviews
+            WHERE MovieID IN ({inClause})
+            GROUP BY MovieID";
+
+            var ratings = new Dictionary<int, double>();
 
             _db.OpenConnection();
             try
             {
                 using var cmd = new SqlCommand(query, _db.Connection);
-                for (var i = 0; i < ids.Count; i++)
+
+                for (int i = 0; i < ids.Count; i++)
                     cmd.Parameters.AddWithValue(paramNames[i], ids[i]);
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    var movieId = reader.GetInt32(0);
-                    var star = reader.GetInt32(1);
+                    int movieId = reader.GetInt32(0);
+                    double avg = reader.IsDBNull(1) ? 0 : reader.GetDouble(1);
 
-                    if (!ratingsByMovieId.TryGetValue(movieId, out var list))
-                        ratingsByMovieId[movieId] = list = new List<decimal>();
-
-                    list.Add(star);
+                    ratings[movieId] = avg;
                 }
             }
             finally
@@ -195,8 +197,8 @@ namespace MovieShop.Repositories
 
             foreach (var m in movies)
             {
-                if (ratingsByMovieId.TryGetValue(m.ID, out var stars) && stars.Count > 0)
-                    m.Rating = stars.Average(s => (double)s);
+                if (ratings.TryGetValue(m.ID, out var avg))
+                    m.Rating = avg;
                 else
                     m.Rating = 0;
             }

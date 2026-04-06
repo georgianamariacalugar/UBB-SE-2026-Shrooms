@@ -25,11 +25,9 @@ namespace MovieShop.Views
     public sealed partial class MainPage : UserControl
     {
         public ViewModels.FlashSaleViewModel FlashSaleVM => MovieShop.Services.SaleService.CurrentSale;
-        private readonly IMovieRepository _movieRepo = App.Services.GetRequiredService<IMovieRepository>();
-        private readonly IActiveSalesRepository _salesRepo = App.Services.GetRequiredService<IActiveSalesRepository>();
-        private readonly IDatabaseSingleton _db = App.Services.GetRequiredService<IDatabaseSingleton>();
         private List<Movie> _sourceMovies = new();
         private Dictionary<int, int> _reviewCountByMovieId = new();
+        private readonly IMovieCatalogService _catalogService = App.Services.GetRequiredService<IMovieCatalogService>();
 
         public MainPage()
         {
@@ -84,20 +82,11 @@ namespace MovieShop.Views
 
         private void RefreshUndiscountedMovies()
         {
-            var all = _movieRepo.GetAllMovies();
-            var discountMap = _salesRepo.GetBestDiscountPercentByMovieId();
-            ActiveSalesRepo.ApplyBestDiscountsToMovies(all, discountMap);
+            var (movies, reviewCounts) = _catalogService.GetUndiscountedMovies();
 
-            var onSaleIds = _salesRepo.GetCurrentSales()
-                                      .Select(s => s.Movie.ID)
-                                      .Distinct()
-                                      .ToHashSet();
+            _sourceMovies = movies;
+            _reviewCountByMovieId = reviewCounts;
 
-            var undiscounted = all.Where(m => !onSaleIds.Contains(m.ID)).ToList();
-            var reviewCountMap = GetReviewCounts(undiscounted.Select(m => m.ID).Distinct().ToList());
-
-            _sourceMovies = undiscounted;
-            _reviewCountByMovieId = reviewCountMap;
             ApplyFilterAndSort();
         }
 
@@ -168,39 +157,5 @@ namespace MovieShop.Views
             return null;
         }
 
-        private Dictionary<int, int> GetReviewCounts(List<int> movieIds)
-        {
-            var result = new Dictionary<int, int>();
-            if (movieIds.Count == 0) return result;
-
-            _db.OpenConnection();
-
-            try
-            {
-                var paramNames = movieIds.Select((_, i) => $"@id{i}").ToArray();
-                var inClause = string.Join(",", paramNames);
-                var query = $@"SELECT MovieID
-                                FROM Reviews
-                                WHERE MovieID IN ({inClause})";
-
-                using var cmd = new SqlCommand(query, _db.Connection);
-                for (var i = 0; i < movieIds.Count; i++)
-                    cmd.Parameters.AddWithValue(paramNames[i], movieIds[i]);
-
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    var movieId = reader.GetInt32(0);
-                    result.TryGetValue(movieId, out var cnt);
-                    result[movieId] = cnt + 1;
-                }
-            }
-            finally
-            {
-                _db.CloseConnection();
-            }
-
-            return result;
-        }
     }
 }
